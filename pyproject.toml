@@ -1,0 +1,60 @@
+[project]
+name = "devices"
+version = "0.1.0"
+description = "PlaceBrain IoT Devices Service"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "aiomqtt>=2.3.0",
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+    "bcrypt>=4.3.0",
+    "dishka>=1.7.2",
+    "greenlet>=3.3.0",
+    "grpcio>=1.76.0",
+    "placebrain-contracts>=0.4.0",
+    "pydantic-settings>=2.12.0",
+    "sqlalchemy>=2.0.45",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "ruff>=0.14.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+extend-select = ["I"]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "C4",
+]
+
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"src/handlers/*.py" = ["N802"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+
+[[tool.mypy.overrides]]
+module = "grpc.*"
+ignore_missing_imports = true
