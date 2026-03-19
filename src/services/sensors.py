@@ -180,3 +180,15 @@ class SensorsService:
         async with self.uow:
             thresholds = await self.uow.sensor_threshold_repository.get_all(sensor_id=sensor_id)
             return list(thresholds)
+
+    async def get_all_thresholds(
+        self,
+    ) -> list[tuple[Sensor, list[SensorThreshold]]]:
+        async with self.uow:
+            sensors = await self.uow.sensor_repository.get_all()
+            result: list[tuple[Sensor, list[SensorThreshold]]] = []
+            for sensor in sensors:
+                thresholds = await self.uow.sensor_threshold_repository.get_all(sensor_id=sensor.id)
+                if thresholds:
+                    result.append((sensor, list(thresholds)))
+            return result

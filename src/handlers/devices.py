@@ -28,6 +28,8 @@ from placebrain_contracts.devices_pb2 import (
     DeviceSummary,
     GenerateMqttCredentialsRequest,
     GenerateMqttCredentialsResponse,
+    GetAllThresholdsRequest,
+    GetAllThresholdsResponse,
     GetDeviceRequest,
     GetDeviceResponse,
     GetSensorThresholdsRequest,
@@ -45,6 +47,7 @@ from placebrain_contracts.devices_pb2 import (
     SendCommandRequest,
     SendCommandResponse,
     SensorInfo,
+    SensorWithThresholds,
     SetThresholdRequest,
     SetThresholdResponse,
     ThresholdInfo,
@@ -739,3 +742,43 @@ class DevicesHandler(DevicesServiceServicer):
         except ValueError as e:
             await context.abort(grpc.StatusCode.NOT_FOUND, str(e))
             raise
+
+    # --- GetAllThresholds (for collector) ---
+
+    @inject
+    async def GetAllThresholds(  # type: ignore[override]
+        self,
+        request: GetAllThresholdsRequest,
+        context: grpc.aio.ServicerContext,
+        sensors_service: FromDishka[SensorsService],
+        devices_service: FromDishka[DevicesService],
+    ) -> GetAllThresholdsResponse:
+        logger.info("GetAllThresholds called")
+        sensor_threshold_pairs = await sensors_service.get_all_thresholds()
+        device_cache: dict[UUID, str] = {}
+        result = []
+        for sensor, thresholds in sensor_threshold_pairs:
+            if sensor.device_id not in device_cache:
+                async with devices_service.uow:
+                    device = await devices_service.uow.device_repository.get_by_id(sensor.device_id)
+                    device_cache[sensor.device_id] = str(device.place_id) if device else ""
+            place_id = device_cache[sensor.device_id]
+            result.append(
+                SensorWithThresholds(
+                    sensor_id=str(sensor.id),
+                    device_id=str(sensor.device_id),
+                    place_id=place_id,
+                    key=sensor.key,
+                    thresholds=[
+                        ThresholdInfo(
+                            threshold_id=str(t.id),
+                            sensor_id=str(t.sensor_id),
+                            type=_THRESHOLD_TYPE_TO_PROTO.get(t.type, 0),
+                            value=t.value,
+                            severity=_SEVERITY_TO_PROTO.get(t.severity, 0),
+                        )
+                        for t in thresholds
+                    ],
+                )
+            )
+        return GetAllThresholdsResponse(sensors=result)
