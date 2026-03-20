@@ -88,6 +88,11 @@ class DevicesService:
             await self.uow.device_repository.update(device_id, token_hash=token_hash)
             return token
 
+    async def delete_devices_by_place(self, place_id: UUID) -> tuple[int, list[str]]:
+        async with self.uow:
+            deleted_count, device_ids = await self.uow.device_repository.delete_by_place(place_id)
+            return deleted_count, device_ids
+
     async def update_device_status(self, device_id: UUID, status: DeviceStatusEnum) -> bool:
         async with self.uow:
             device = await self.uow.device_repository.get_by_id(device_id)

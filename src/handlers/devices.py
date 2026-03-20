@@ -20,6 +20,8 @@ from placebrain_contracts.devices_pb2 import (
     DeleteActuatorResponse,
     DeleteDeviceRequest,
     DeleteDeviceResponse,
+    DeleteDevicesByPlaceRequest,
+    DeleteDevicesByPlaceResponse,
     DeleteSensorRequest,
     DeleteSensorResponse,
     DeleteThresholdRequest,
@@ -289,6 +291,21 @@ class DevicesHandler(DevicesServiceServicer):
         except ValueError as e:
             await context.abort(grpc.StatusCode.NOT_FOUND, str(e))
             raise
+
+    @inject
+    async def DeleteDevicesByPlace(  # type: ignore[override]
+        self,
+        request: DeleteDevicesByPlaceRequest,
+        context: grpc.aio.ServicerContext,
+        devices_service: FromDishka[DevicesService],
+    ) -> DeleteDevicesByPlaceResponse:
+        logger.info("DeleteDevicesByPlace called for place: %s", request.place_id)
+        deleted_count, device_ids = await devices_service.delete_devices_by_place(
+            UUID(request.place_id)
+        )
+        return DeleteDevicesByPlaceResponse(
+            success=True, deleted_count=deleted_count, device_ids=device_ids
+        )
 
     @inject
     async def RegenerateDeviceToken(  # type: ignore[override]
