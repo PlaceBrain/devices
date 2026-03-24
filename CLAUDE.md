@@ -16,6 +16,11 @@
 - Usernames: `device:{id}` / `user:{id}` / `collector`
 - ACL: устройства pub telemetry/status, sub command; пользователи sub по place_ids; collector pub alerts, sub telemetry/status
 
+## Роли и авторизация
+
+- Константы ролей — в `src/core/roles.py` (импорт из proto). **Не хардкодить** числовые значения `{1, 2}`
+- Проверка ролей через places-сервис (gRPC `GetPlace` → `user_role`)
+
 ## Internal методы (без auth)
 
 - GetAllThresholds, GetSensorThresholds, UpdateDeviceStatus
