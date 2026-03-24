@@ -6,12 +6,11 @@ import aiomqtt
 from placebrain_contracts.places_pb2 import GetPlaceRequest
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
+from src.core.roles import WRITE_ROLES
 from src.infra.db.models.actuator import ActuatorValueTypeEnum
 from src.infra.db.uow import UnitOfWork
 
 logger = logging.getLogger(__name__)
-
-_WRITE_ROLES = {1, 2}  # ROLE_OWNER, ROLE_ADMIN
 
 
 class CommandsService:
@@ -33,7 +32,7 @@ class CommandsService:
         response = await self.places_stub.GetPlace(
             GetPlaceRequest(user_id=str(user_id), place_id=str(place_id))
         )
-        if response.user_role not in _WRITE_ROLES:
+        if response.user_role not in WRITE_ROLES:
             raise PermissionError("Only owner or admin can send commands")
 
         async with self.uow:

@@ -300,12 +300,16 @@ class DevicesHandler(DevicesServiceServicer):
         devices_service: FromDishka[DevicesService],
     ) -> DeleteDevicesByPlaceResponse:
         logger.info("DeleteDevicesByPlace called for place: %s", request.place_id)
-        deleted_count, device_ids = await devices_service.delete_devices_by_place(
-            UUID(request.place_id)
-        )
-        return DeleteDevicesByPlaceResponse(
-            success=True, deleted_count=deleted_count, device_ids=device_ids
-        )
+        try:
+            deleted_count, device_ids = await devices_service.delete_devices_by_place(
+                UUID(request.place_id)
+            )
+            return DeleteDevicesByPlaceResponse(
+                success=True, deleted_count=deleted_count, device_ids=device_ids
+            )
+        except ValueError as e:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
+            raise
 
     @inject
     async def RegenerateDeviceToken(  # type: ignore[override]

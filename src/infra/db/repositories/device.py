@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infra.db.models.device import Device
@@ -13,11 +13,8 @@ class DeviceRepository(BaseRepository[Device]):
         super().__init__(Device, session)
 
     async def delete_by_place(self, place_id: UUID) -> tuple[int, list[str]]:
-        ids_result = await self.session.scalars(
-            select(Device.id).where(Device.place_id == place_id)
+        result = await self.session.execute(
+            delete(Device).where(Device.place_id == place_id).returning(Device.id)
         )
-        device_ids = [str(did) for did in ids_result.all()]
-        if not device_ids:
-            return 0, []
-        result = await self.session.execute(delete(Device).where(Device.place_id == place_id))
-        return result.rowcount, device_ids
+        deleted_ids = result.scalars().all()
+        return len(deleted_ids), [str(did) for did in deleted_ids]
