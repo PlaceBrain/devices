@@ -12,6 +12,7 @@ from src.dependencies.db import DBProvider
 from src.dependencies.devices import DevicesProvider
 from src.dependencies.grpc import PlacesStubProvider
 from src.dependencies.mqtt import MqttProvider
+from src.dependencies.redis import RedisProvider
 from src.handlers.devices import DevicesHandler
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ async def serve() -> None:
     container = make_async_container(
         ConfigProvider(),
         DBProvider(),
+        RedisProvider(),
         PlacesStubProvider(),
         MqttProvider(),
         DevicesProvider(),

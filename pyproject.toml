@@ -12,7 +12,9 @@ dependencies = [
     "dishka>=1.7.2",
     "greenlet>=3.3.0",
     "grpcio>=1.76.0",
-    "placebrain-contracts>=0.8.0",
+    "orjson>=3.10.0",
+    "placebrain-contracts>=0.11.0",
+    "redis[hiredis]>=6.0.0",
     "pydantic-settings>=2.12.0",
     "sqlalchemy>=2.0.45",
 ]

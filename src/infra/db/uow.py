@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.infra.db.repositories import (
     ActuatorRepository,
     DeviceRepository,
-    MqttCredentialRepository,
     SensorRepository,
     SensorThresholdRepository,
 )
@@ -33,7 +32,6 @@ class UnitOfWork(AbstractAsyncContextManager["UnitOfWork"]):
         self.sensor_repository = SensorRepository(self.session)
         self.sensor_threshold_repository = SensorThresholdRepository(self.session)
         self.actuator_repository = ActuatorRepository(self.session)
-        self.mqtt_credential_repository = MqttCredentialRepository(self.session)
         return self
 
     async def commit(self) -> None:

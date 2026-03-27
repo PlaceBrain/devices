@@ -1,6 +1,7 @@
 import aiomqtt
 from dishka import Provider, Scope, provide
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
+from redis.asyncio import Redis
 
 from src.infra.db.uow import UnitOfWork
 from src.services.actuators import ActuatorsService
@@ -37,6 +38,6 @@ class DevicesProvider(Provider):
 
     @provide(scope=Scope.REQUEST)
     def provide_mqtt_auth_service(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub
+        self, uow: UnitOfWork, places_stub: PlacesServiceStub, redis: Redis
     ) -> MqttAuthService:
-        return MqttAuthService(uow, places_stub)
+        return MqttAuthService(uow, places_stub, redis)

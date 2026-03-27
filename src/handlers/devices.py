@@ -36,6 +36,8 @@ from placebrain_contracts.devices_pb2 import (
     GetDeviceResponse,
     GetSensorThresholdsRequest,
     GetSensorThresholdsResponse,
+    InvalidateMqttCredentialsRequest,
+    InvalidateMqttCredentialsResponse,
     ListActuatorsRequest,
     ListActuatorsResponse,
     ListDevicesRequest,
@@ -741,6 +743,17 @@ class DevicesHandler(DevicesServiceServicer):
         return GenerateMqttCredentialsResponse(
             username=username, password=password, expires_at=expires_at
         )
+
+    @inject
+    async def InvalidateMqttCredentials(  # type: ignore[override]
+        self,
+        request: InvalidateMqttCredentialsRequest,
+        context: grpc.aio.ServicerContext,
+        mqtt_auth_service: FromDishka[MqttAuthService],
+    ) -> InvalidateMqttCredentialsResponse:
+        logger.info("InvalidateMqttCredentials called for %d users", len(request.user_ids))
+        await mqtt_auth_service.invalidate_credentials(list(request.user_ids))
+        return InvalidateMqttCredentialsResponse(success=True)
 
     # --- Device status ---
 
