@@ -67,6 +67,11 @@ class ActuatorsService:
             )
             return str(actuator.id)
 
+    async def list_by_device_id(self, device_id: UUID) -> list[Actuator]:
+        async with self.uow:
+            actuators = await self.uow.actuator_repository.get_all(device_id=device_id)
+            return list(actuators)
+
     async def list_actuators(
         self, user_id: UUID, place_id: UUID, device_id: UUID
     ) -> list[Actuator]:

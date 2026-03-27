@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import re
 import secrets
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from uuid import UUID
 
 import bcrypt
@@ -48,7 +50,10 @@ class MqttAuthService:
             device = await self.uow.device_repository.get_by_id(device_id)
             if not device:
                 return False
-            return bcrypt.checkpw(password.encode(), device.token_hash.encode())
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None, partial(bcrypt.checkpw, password.encode(), device.token_hash.encode())
+            )
 
     async def _authenticate_user(self, user_id_str: str, password: str) -> bool:
         async with self.uow:
@@ -59,7 +64,10 @@ class MqttAuthService:
                 return False
             if cred.expires_at < datetime.now(UTC):
                 return False
-            return bcrypt.checkpw(password.encode(), cred.password_hash.encode())
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None, partial(bcrypt.checkpw, password.encode(), cred.password_hash.encode())
+            )
 
     async def check_acl(self, username: str, topic: str, action: str) -> bool:
         if username == COLLECTOR_USERNAME:
@@ -135,7 +143,10 @@ class MqttAuthService:
         allowed_place_ids = [p.place_id for p in places_response.places]
 
         password = secrets.token_urlsafe(32)
-        password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        loop = asyncio.get_running_loop()
+        password_hash = await loop.run_in_executor(
+            None, lambda: bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        )
         username = f"user:{user_id}"
         expires_at = datetime.now(UTC) + MQTT_CREDENTIALS_TTL
 

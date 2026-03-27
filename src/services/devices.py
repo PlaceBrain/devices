@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 from uuid import UUID
@@ -31,14 +32,17 @@ class DevicesService:
         )
 
     @staticmethod
-    def _generate_token() -> tuple[str, str]:
+    async def _generate_token() -> tuple[str, str]:
         token = secrets.token_urlsafe(32)
-        token_hash = bcrypt.hashpw(token.encode(), bcrypt.gensalt()).decode()
+        loop = asyncio.get_running_loop()
+        token_hash = await loop.run_in_executor(
+            None, lambda: bcrypt.hashpw(token.encode(), bcrypt.gensalt()).decode()
+        )
         return token, token_hash
 
     async def create_device(self, user_id: UUID, place_id: UUID, name: str) -> tuple[str, str]:
         await self._check_permission(user_id, place_id)
-        token, token_hash = self._generate_token()
+        token, token_hash = await self._generate_token()
         async with self.uow:
             device = await self.uow.device_repository.create(
                 place_id=place_id, name=name, token_hash=token_hash
@@ -79,7 +83,7 @@ class DevicesService:
 
     async def regenerate_token(self, user_id: UUID, place_id: UUID, device_id: UUID) -> str:
         await self._check_permission(user_id, place_id)
-        token, token_hash = self._generate_token()
+        token, token_hash = await self._generate_token()
         async with self.uow:
             device = await self.uow.device_repository.get_by_id(device_id)
             if not device or device.place_id != place_id:

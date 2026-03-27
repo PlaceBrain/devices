@@ -166,12 +166,8 @@ class DevicesHandler(DevicesServiceServicer):
             device = await devices_service.get_device(
                 UUID(request.user_id), UUID(request.place_id), UUID(request.device_id)
             )
-            sensors = await sensors_service.list_sensors(
-                UUID(request.user_id), UUID(request.place_id), UUID(request.device_id)
-            )
-            actuators = await actuators_service.list_actuators(
-                UUID(request.user_id), UUID(request.place_id), UUID(request.device_id)
-            )
+            sensors = await sensors_service.list_by_device_id(UUID(request.device_id))
+            actuators = await actuators_service.list_by_device_id(UUID(request.device_id))
             return GetDeviceResponse(
                 device=DeviceInfo(
                     device_id=str(device.id),

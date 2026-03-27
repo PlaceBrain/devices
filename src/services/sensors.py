@@ -70,6 +70,11 @@ class SensorsService:
             )
             return str(sensor.id)
 
+    async def list_by_device_id(self, device_id: UUID) -> list[Sensor]:
+        async with self.uow:
+            sensors = await self.uow.sensor_repository.get_all(device_id=device_id)
+            return list(sensors)
+
     async def list_sensors(self, user_id: UUID, place_id: UUID, device_id: UUID) -> list[Sensor]:
         await self._check_read_permission(user_id, place_id)
         async with self.uow:
