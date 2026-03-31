@@ -57,11 +57,20 @@ class DevicesService:
                 raise ValueError("Device not found")
             return device
 
-    async def list_devices(self, user_id: UUID, place_id: UUID) -> list[Device]:
+    async def list_devices(
+        self, user_id: UUID, place_id: UUID, page: int = 1, per_page: int = 20
+    ) -> tuple[list[Device], int]:
         await self._check_read_permission(user_id, place_id)
         async with self.uow:
-            devices = await self.uow.device_repository.get_all(place_id=place_id)
-            return list(devices)
+            filters = [Device.place_id == place_id]
+            devices = await self.uow.device_repository.find(
+                filters=filters,
+                order_by=Device.created_at.desc(),
+                limit=per_page,
+                offset=(page - 1) * per_page,
+            )
+            total = await self.uow.device_repository.count(filters=filters)
+            return list(devices), total
 
     async def update_device(self, user_id: UUID, place_id: UUID, device_id: UUID, name: str) -> str:
         await self._check_permission(user_id, place_id)

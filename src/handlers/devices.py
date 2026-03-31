@@ -225,8 +225,10 @@ class DevicesHandler(DevicesServiceServicer):
     ) -> ListDevicesResponse:
         logger.info("ListDevices called for place: %s", request.place_id)
         try:
-            devices = await devices_service.list_devices(
-                UUID(request.user_id), UUID(request.place_id)
+            page = request.page if request.page > 0 else 1
+            per_page = min(request.per_page if request.per_page > 0 else 20, 100)
+            devices, total = await devices_service.list_devices(
+                UUID(request.user_id), UUID(request.place_id), page, per_page
             )
             return ListDevicesResponse(
                 devices=[
@@ -238,7 +240,8 @@ class DevicesHandler(DevicesServiceServicer):
                         last_seen_at=d.last_seen_at.isoformat() if d.last_seen_at else "",
                     )
                     for d in devices
-                ]
+                ],
+                total=total,
             )
         except PermissionError as e:
             await context.abort(grpc.StatusCode.PERMISSION_DENIED, str(e))
