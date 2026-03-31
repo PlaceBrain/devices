@@ -32,6 +32,13 @@
 - Константы ролей — в `src/core/roles.py` (импорт из proto). **Не хардкодить** числовые значения `{1, 2}`
 - Проверка ролей через places-сервис (gRPC `GetPlace` → `user_role`)
 
+## Пагинация
+
+- `ListDevices` поддерживает сквозную пагинацию: `page`/`per_page` в proto request, `total` в response
+- Service layer использует `BaseRepository.find(filters, limit, offset)` + `BaseRepository.count(filters)` — два SQL-запроса
+- Handler валидирует параметры: page default=1, per_page default=20, max=100
+- Остальные list-эндпоинты (sensors, actuators, thresholds) **без пагинации** — коллекции естественно ограничены
+
 ## Производительность
 
 - **bcrypt:** все вызовы `hashpw`/`checkpw` вынесены в `loop.run_in_executor()` — не блокируют event loop
