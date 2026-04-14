@@ -5,6 +5,17 @@ import grpc
 from dishka import FromDishka
 from dishka.integrations.grpcio import inject
 from placebrain_contracts import devices_pb2 as devices_pb
+from placebrain_contracts.devices_pb2 import (
+    DEVICE_STATUS_OFFLINE,
+    DEVICE_STATUS_ONLINE,
+    THRESHOLD_SEVERITY_CRITICAL,
+    THRESHOLD_SEVERITY_WARNING,
+    THRESHOLD_TYPE_MAX,
+    THRESHOLD_TYPE_MIN,
+    VALUE_TYPE_BOOLEAN,
+    VALUE_TYPE_ENUM,
+    VALUE_TYPE_NUMBER,
+)
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceServicer
 
 from src.core.exceptions import (
@@ -26,55 +37,55 @@ from src.services.sensors import SensorsService
 logger = logging.getLogger(__name__)
 
 _STATUS_TO_PROTO = {
-    DeviceStatusEnum.ONLINE: 1,
-    DeviceStatusEnum.OFFLINE: 2,
+    DeviceStatusEnum.ONLINE: DEVICE_STATUS_ONLINE,
+    DeviceStatusEnum.OFFLINE: DEVICE_STATUS_OFFLINE,
 }
 
 _PROTO_TO_STATUS = {
-    1: DeviceStatusEnum.ONLINE,
-    2: DeviceStatusEnum.OFFLINE,
+    DEVICE_STATUS_ONLINE: DeviceStatusEnum.ONLINE,
+    DEVICE_STATUS_OFFLINE: DeviceStatusEnum.OFFLINE,
 }
 
 _VALUE_TYPE_TO_PROTO = {
-    ValueTypeEnum.NUMBER: 1,
-    ValueTypeEnum.BOOLEAN: 2,
+    ValueTypeEnum.NUMBER: VALUE_TYPE_NUMBER,
+    ValueTypeEnum.BOOLEAN: VALUE_TYPE_BOOLEAN,
 }
 
 _PROTO_TO_VALUE_TYPE = {
-    1: ValueTypeEnum.NUMBER,
-    2: ValueTypeEnum.BOOLEAN,
+    VALUE_TYPE_NUMBER: ValueTypeEnum.NUMBER,
+    VALUE_TYPE_BOOLEAN: ValueTypeEnum.BOOLEAN,
 }
 
 _ACTUATOR_VALUE_TYPE_TO_PROTO = {
-    ActuatorValueTypeEnum.NUMBER: 1,
-    ActuatorValueTypeEnum.BOOLEAN: 2,
-    ActuatorValueTypeEnum.ENUM: 3,
+    ActuatorValueTypeEnum.NUMBER: VALUE_TYPE_NUMBER,
+    ActuatorValueTypeEnum.BOOLEAN: VALUE_TYPE_BOOLEAN,
+    ActuatorValueTypeEnum.ENUM: VALUE_TYPE_ENUM,
 }
 
 _PROTO_TO_ACTUATOR_VALUE_TYPE = {
-    1: ActuatorValueTypeEnum.NUMBER,
-    2: ActuatorValueTypeEnum.BOOLEAN,
-    3: ActuatorValueTypeEnum.ENUM,
+    VALUE_TYPE_NUMBER: ActuatorValueTypeEnum.NUMBER,
+    VALUE_TYPE_BOOLEAN: ActuatorValueTypeEnum.BOOLEAN,
+    VALUE_TYPE_ENUM: ActuatorValueTypeEnum.ENUM,
 }
 
 _THRESHOLD_TYPE_TO_PROTO = {
-    ThresholdTypeEnum.MIN: 1,
-    ThresholdTypeEnum.MAX: 2,
+    ThresholdTypeEnum.MIN: THRESHOLD_TYPE_MIN,
+    ThresholdTypeEnum.MAX: THRESHOLD_TYPE_MAX,
 }
 
 _PROTO_TO_THRESHOLD_TYPE = {
-    1: ThresholdTypeEnum.MIN,
-    2: ThresholdTypeEnum.MAX,
+    THRESHOLD_TYPE_MIN: ThresholdTypeEnum.MIN,
+    THRESHOLD_TYPE_MAX: ThresholdTypeEnum.MAX,
 }
 
 _SEVERITY_TO_PROTO = {
-    ThresholdSeverityEnum.WARNING: 1,
-    ThresholdSeverityEnum.CRITICAL: 2,
+    ThresholdSeverityEnum.WARNING: THRESHOLD_SEVERITY_WARNING,
+    ThresholdSeverityEnum.CRITICAL: THRESHOLD_SEVERITY_CRITICAL,
 }
 
 _PROTO_TO_SEVERITY = {
-    1: ThresholdSeverityEnum.WARNING,
-    2: ThresholdSeverityEnum.CRITICAL,
+    THRESHOLD_SEVERITY_WARNING: ThresholdSeverityEnum.WARNING,
+    THRESHOLD_SEVERITY_CRITICAL: ThresholdSeverityEnum.CRITICAL,
 }
 
 

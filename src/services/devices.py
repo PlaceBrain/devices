@@ -2,6 +2,7 @@ import asyncio
 import logging
 import secrets
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import bcrypt
@@ -91,7 +92,7 @@ class DevicesService:
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device:
             raise NotFoundError("Device not found")
-        update_data: dict = {"status": status}
+        update_data: dict[str, Any] = {"status": status}
         if status == DeviceStatusEnum.ONLINE:
             update_data["last_seen_at"] = datetime.now(UTC)
         await self.uow.device_repository.update(device_id, **update_data)
