@@ -49,14 +49,13 @@ class MqttAuthService:
         except ValueError:
             return False
 
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device:
-                return False
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
-                None, partial(bcrypt.checkpw, password.encode(), device.token_hash.encode())
-            )
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device:
+            return False
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, partial(bcrypt.checkpw, password.encode(), device.token_hash.encode())
+        )
 
     async def _authenticate_user(self, user_id_str: str, password: str) -> bool:
         redis_key = f"mqtt:cred:user:{user_id_str}"
@@ -88,26 +87,25 @@ class MqttAuthService:
         except ValueError:
             return False
 
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device:
-                return False
-
-            place_id = str(device.place_id)
-            dev_id = str(device.id)
-            allowed_pub = {
-                f"placebrain/{place_id}/devices/{dev_id}/telemetry",
-                f"placebrain/{place_id}/devices/{dev_id}/status",
-            }
-            allowed_sub = {
-                f"placebrain/{place_id}/devices/{dev_id}/command",
-            }
-
-            if action == "publish":
-                return topic in allowed_pub
-            elif action == "subscribe":
-                return topic in allowed_sub
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device:
             return False
+
+        place_id = str(device.place_id)
+        dev_id = str(device.id)
+        allowed_pub = {
+            f"placebrain/{place_id}/devices/{dev_id}/telemetry",
+            f"placebrain/{place_id}/devices/{dev_id}/status",
+        }
+        allowed_sub = {
+            f"placebrain/{place_id}/devices/{dev_id}/command",
+        }
+
+        if action == "publish":
+            return topic in allowed_pub
+        elif action == "subscribe":
+            return topic in allowed_sub
+        return False
 
     async def _check_user_acl(self, user_id_str: str, topic: str, action: str) -> bool:
         if action == "publish":

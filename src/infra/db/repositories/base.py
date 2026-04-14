@@ -38,10 +38,10 @@ class BaseRepository[T: Base]:
         if load_options:
             query = query.options(*load_options)
 
-        if offset:
+        if offset is not None:
             query = query.offset(offset)
 
-        if limit:
+        if limit is not None:
             query = query.limit(limit)
 
         result = await self.session.scalars(query)

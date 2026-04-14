@@ -14,5 +14,7 @@ class DBProvider(Provider):
         await db_helper.dispose()
 
     @provide(scope=Scope.REQUEST)
-    def provide_uow(self, db_helper: DatabaseHelper) -> UnitOfWork:
-        return UnitOfWork(db_helper.async_session_factory)
+    async def provide_uow(self, db_helper: DatabaseHelper) -> AsyncIterable[UnitOfWork]:
+        uow = UnitOfWork(db_helper.async_session_factory)
+        async with uow:
+            yield uow

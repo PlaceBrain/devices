@@ -1,13 +1,14 @@
 import asyncio
 import logging
 import secrets
+from datetime import UTC, datetime
 from uuid import UUID
 
 import bcrypt
-from placebrain_contracts.places_pb2 import GetPlaceRequest
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
-from src.core.roles import WRITE_ROLES
+from src.core.authorization import check_read_permission, check_write_permission
+from src.core.exceptions import NotFoundError
 from src.infra.db.models.device import Device, DeviceStatusEnum
 from src.infra.db.uow import UnitOfWork
 
@@ -19,18 +20,6 @@ class DevicesService:
         self.uow = uow
         self.places_stub = places_stub
 
-    async def _check_permission(self, user_id: UUID, place_id: UUID) -> None:
-        response = await self.places_stub.GetPlace(
-            GetPlaceRequest(user_id=str(user_id), place_id=str(place_id))
-        )
-        if response.user_role not in WRITE_ROLES:
-            raise PermissionError("Only owner or admin can manage devices")
-
-    async def _check_read_permission(self, user_id: UUID, place_id: UUID) -> None:
-        await self.places_stub.GetPlace(
-            GetPlaceRequest(user_id=str(user_id), place_id=str(place_id))
-        )
-
     @staticmethod
     async def _generate_token() -> tuple[str, str]:
         token = secrets.token_urlsafe(32)
@@ -41,79 +30,73 @@ class DevicesService:
         return token, token_hash
 
     async def create_device(self, user_id: UUID, place_id: UUID, name: str) -> tuple[str, str]:
-        await self._check_permission(user_id, place_id)
+        await check_write_permission(self.places_stub, user_id, place_id)
         token, token_hash = await self._generate_token()
-        async with self.uow:
-            device = await self.uow.device_repository.create(
-                place_id=place_id, name=name, token_hash=token_hash
-            )
-            return str(device.id), token
+        device = await self.uow.device_repository.create(
+            place_id=place_id, name=name, token_hash=token_hash
+        )
+        return str(device.id), token
 
     async def get_device(self, user_id: UUID, place_id: UUID, device_id: UUID) -> Device:
-        await self._check_read_permission(user_id, place_id)
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device or device.place_id != place_id:
-                raise ValueError("Device not found")
-            return device
+        await check_read_permission(self.places_stub, user_id, place_id)
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device or device.place_id != place_id:
+            raise NotFoundError("Device not found")
+        return device
 
     async def list_devices(
         self, user_id: UUID, place_id: UUID, page: int = 1, per_page: int = 20
     ) -> tuple[list[Device], int]:
-        await self._check_read_permission(user_id, place_id)
-        async with self.uow:
-            filters = [Device.place_id == place_id]
-            devices = await self.uow.device_repository.find(
-                filters=filters,
-                order_by=Device.created_at.desc(),
-                limit=per_page,
-                offset=(page - 1) * per_page,
-            )
-            total = await self.uow.device_repository.count(filters=filters)
-            return list(devices), total
+        await check_read_permission(self.places_stub, user_id, place_id)
+        filters = [Device.place_id == place_id]
+        devices = await self.uow.device_repository.find(
+            filters=filters,
+            order_by=Device.created_at.desc(),
+            limit=per_page,
+            offset=(page - 1) * per_page,
+        )
+        total = await self.uow.device_repository.count(filters=filters)
+        return list(devices), total
 
     async def update_device(self, user_id: UUID, place_id: UUID, device_id: UUID, name: str) -> str:
-        await self._check_permission(user_id, place_id)
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device or device.place_id != place_id:
-                raise ValueError("Device not found")
-            await self.uow.device_repository.update(device_id, name=name)
-            return str(device_id)
+        await check_write_permission(self.places_stub, user_id, place_id)
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device or device.place_id != place_id:
+            raise NotFoundError("Device not found")
+        await self.uow.device_repository.update(device_id, name=name)
+        return str(device_id)
 
     async def delete_device(self, user_id: UUID, place_id: UUID, device_id: UUID) -> bool:
-        await self._check_permission(user_id, place_id)
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device or device.place_id != place_id:
-                raise ValueError("Device not found")
-            await self.uow.device_repository.delete(device)
-            return True
+        await check_write_permission(self.places_stub, user_id, place_id)
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device or device.place_id != place_id:
+            raise NotFoundError("Device not found")
+        await self.uow.device_repository.delete(device)
+        return True
 
     async def regenerate_token(self, user_id: UUID, place_id: UUID, device_id: UUID) -> str:
-        await self._check_permission(user_id, place_id)
+        await check_write_permission(self.places_stub, user_id, place_id)
         token, token_hash = await self._generate_token()
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device or device.place_id != place_id:
-                raise ValueError("Device not found")
-            await self.uow.device_repository.update(device_id, token_hash=token_hash)
-            return token
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device or device.place_id != place_id:
+            raise NotFoundError("Device not found")
+        await self.uow.device_repository.update(device_id, token_hash=token_hash)
+        return token
 
     async def delete_devices_by_place(self, place_id: UUID) -> tuple[int, list[str]]:
-        async with self.uow:
-            deleted_count, device_ids = await self.uow.device_repository.delete_by_place(place_id)
-            return deleted_count, device_ids
+        deleted_count, device_ids = await self.uow.device_repository.delete_by_place(place_id)
+        return deleted_count, device_ids
 
     async def update_device_status(self, device_id: UUID, status: DeviceStatusEnum) -> bool:
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device:
-                raise ValueError("Device not found")
-            from datetime import UTC, datetime
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device:
+            raise NotFoundError("Device not found")
+        update_data: dict = {"status": status}
+        if status == DeviceStatusEnum.ONLINE:
+            update_data["last_seen_at"] = datetime.now(UTC)
+        await self.uow.device_repository.update(device_id, **update_data)
+        return True
 
-            update_data: dict = {"status": status}
-            if status == DeviceStatusEnum.ONLINE:
-                update_data["last_seen_at"] = datetime.now(UTC)
-            await self.uow.device_repository.update(device_id, **update_data)
-            return True
+    async def get_place_id_for_device(self, device_id: UUID) -> str:
+        device = await self.uow.device_repository.get_by_id(device_id)
+        return str(device.place_id) if device else ""

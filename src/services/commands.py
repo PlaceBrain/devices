@@ -3,11 +3,11 @@ import logging
 from uuid import UUID
 
 import aiomqtt
-from placebrain_contracts.places_pb2 import GetPlaceRequest
 from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
-from src.core.roles import WRITE_ROLES
-from src.infra.db.models.actuator import ActuatorValueTypeEnum
+from src.core.authorization import check_write_permission
+from src.core.exceptions import InvalidValueError, NotFoundError
+from src.infra.db.models.actuator import Actuator, ActuatorValueTypeEnum
 from src.infra.db.uow import UnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -29,24 +29,19 @@ class CommandsService:
         actuator_key: str,
         value: str,
     ) -> bool:
-        response = await self.places_stub.GetPlace(
-            GetPlaceRequest(user_id=str(user_id), place_id=str(place_id))
+        await check_write_permission(self.places_stub, user_id, place_id)
+
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device or device.place_id != place_id:
+            raise NotFoundError("Device not found")
+
+        actuator = await self.uow.actuator_repository.get_one_or_none(
+            device_id=device_id, key=actuator_key
         )
-        if response.user_role not in WRITE_ROLES:
-            raise PermissionError("Only owner or admin can send commands")
+        if not actuator:
+            raise NotFoundError(f"Actuator '{actuator_key}' not found on this device")
 
-        async with self.uow:
-            device = await self.uow.device_repository.get_by_id(device_id)
-            if not device or device.place_id != place_id:
-                raise ValueError("Device not found")
-
-            actuator = await self.uow.actuator_repository.get_one_or_none(
-                device_id=device_id, key=actuator_key
-            )
-            if not actuator:
-                raise ValueError(f"Actuator '{actuator_key}' not found on this device")
-
-            self._validate_value(actuator.value_type, value, actuator)
+        self._validate_value(actuator.value_type, value, actuator)
 
         topic = f"placebrain/{place_id}/devices/{device_id}/command"
         payload = json.dumps({"actuator_key": actuator_key, "value": value})
@@ -55,23 +50,23 @@ class CommandsService:
         return True
 
     @staticmethod
-    def _validate_value(value_type: ActuatorValueTypeEnum, value: str, actuator: object) -> None:
+    def _validate_value(value_type: ActuatorValueTypeEnum, value: str, actuator: Actuator) -> None:
         if value_type == ActuatorValueTypeEnum.BOOLEAN:
             if value.lower() not in ("true", "false"):
-                raise ValueError("Boolean actuator value must be 'true' or 'false'")
+                raise InvalidValueError("Boolean actuator value must be 'true' or 'false'")
         elif value_type == ActuatorValueTypeEnum.NUMBER:
             try:
                 num = float(value)
             except ValueError:
-                raise ValueError("Number actuator value must be numeric") from None
-            if actuator.min_value is not None and num < actuator.min_value:  # type: ignore[union-attr]
-                raise ValueError(f"Value below minimum ({actuator.min_value})")  # type: ignore[union-attr]
-            if actuator.max_value is not None and num > actuator.max_value:  # type: ignore[union-attr]
-                raise ValueError(f"Value above maximum ({actuator.max_value})")  # type: ignore[union-attr]
-            if actuator.step is not None and actuator.step > 0:  # type: ignore[union-attr]
-                remainder = (num - (actuator.min_value or 0)) % actuator.step  # type: ignore[union-attr]
-                if abs(remainder) > 1e-9 and abs(remainder - actuator.step) > 1e-9:  # type: ignore[union-attr]
-                    raise ValueError(f"Value must be a multiple of step ({actuator.step})")  # type: ignore[union-attr]
+                raise InvalidValueError("Number actuator value must be numeric") from None
+            if actuator.min_value is not None and num < actuator.min_value:
+                raise InvalidValueError(f"Value below minimum ({actuator.min_value})")
+            if actuator.max_value is not None and num > actuator.max_value:
+                raise InvalidValueError(f"Value above maximum ({actuator.max_value})")
+            if actuator.step is not None and actuator.step > 0:
+                remainder = (num - (actuator.min_value or 0)) % actuator.step
+                if abs(remainder) > 1e-9 and abs(remainder - actuator.step) > 1e-9:
+                    raise InvalidValueError(f"Value must be a multiple of step ({actuator.step})")
         elif value_type == ActuatorValueTypeEnum.ENUM:
-            if actuator.enum_options and value not in actuator.enum_options:  # type: ignore[union-attr]
-                raise ValueError(f"Value must be one of: {actuator.enum_options}")  # type: ignore[union-attr]
+            if actuator.enum_options and value not in actuator.enum_options:
+                raise InvalidValueError(f"Value must be one of: {actuator.enum_options}")
