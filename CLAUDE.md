@@ -1,11 +1,11 @@
 # Devices Service
 
-- **Порт:** 50053
-- **БД:** devices_db (PostgreSQL), Redis
-- MQTT-клиент для отправки команд на устройства
-- Зависит от places (проверка ролей), MQTT-брокера и Redis
+- **Port:** 50053
+- **DB:** devices_db (PostgreSQL), Redis
+- MQTT client for sending commands to devices
+- Depends on places (role checks), MQTT broker, and Redis
 
-## Структура
+## Structure
 
 ```
 src/
@@ -14,7 +14,7 @@ src/
 │   ├── config.py                    # Pydantic Settings
 │   ├── authorization.py             # check_write_permission, check_read_permission (shared)
 │   ├── exceptions.py                # NotFoundError, AlreadyExistsError, PermissionDeniedError, InvalidValueError
-│   ├── roles.py                     # WRITE_ROLES (из proto-констант)
+│   ├── roles.py                     # WRITE_ROLES (from proto constants)
 │   └── types.py                     # IDType, UNSET sentinel
 ├── dependencies/
 │   ├── config.py
@@ -25,13 +25,13 @@ src/
 │   ├── mqtt_auth.py                 # MqttAuthService (REQUEST)
 │   └── redis.py                     # Redis client (APP)
 ├── handlers/
-│   └── devices.py                   # gRPC DevicesHandler (все RPC-методы)
+│   └── devices.py                   # gRPC DevicesHandler (all RPC methods)
 ├── services/
-│   ├── devices.py                   # CRUD устройств, статус, token
-│   ├── sensors.py                   # CRUD сенсоров, пороги
-│   ├── actuators.py                 # CRUD актуаторов
-│   ├── commands.py                  # Отправка команд через MQTT
-│   └── mqtt_auth.py                 # MQTT аутентификация и ACL
+│   ├── devices.py                   # CRUD devices, status, token
+│   ├── sensors.py                   # CRUD sensors, thresholds
+│   ├── actuators.py                 # CRUD actuators
+│   ├── commands.py                  # Sending commands via MQTT
+│   └── mqtt_auth.py                 # MQTT authentication and ACL
 └── infra/db/
     ├── helper.py
     ├── uow.py
@@ -39,15 +39,15 @@ src/
     └── repositories/
 ```
 
-## Protobuf-импорты
+## Protobuf Imports
 
 ```python
 from placebrain_contracts import devices_pb2 as devices_pb
 ```
 
-## Обработка ошибок
+## Error Handling
 
-Типизированные исключения из `core/exceptions.py`:
+Typed exceptions from `core/exceptions.py`:
 
 | Exception              | gRPC StatusCode      |
 |------------------------|----------------------|
@@ -56,40 +56,40 @@ from placebrain_contracts import devices_pb2 as devices_pb
 | `PermissionDeniedError`| `PERMISSION_DENIED`  |
 | `InvalidValueError`    | `INVALID_ARGUMENT`   |
 
-## Авторизация
+## Authorization
 
-Shared-функции `check_write_permission` и `check_read_permission` в `core/authorization.py`. Проверяют роль через gRPC-вызов к places-сервису.
+Shared functions `check_write_permission` and `check_read_permission` in `core/authorization.py`. They verify roles via gRPC call to the places service.
 
 ## UnitOfWork
 
-Управляется через DI teardown (yield-based). Сервисы работают с репозиториями напрямую без `async with self.uow:`.
+Managed via DI teardown (yield-based). Services work with repositories directly without `async with self.uow:`.
 
-## Модели
+## Models
 
 - Device, Sensor, Actuator, SensorThreshold (PostgreSQL)
-- ValueType: NUMBER, BOOLEAN (для сенсоров)
+- ValueType: NUMBER, BOOLEAN (for sensors)
 - ActuatorValueType: NUMBER, BOOLEAN, ENUM
 - ThresholdType: MIN, MAX; Severity: WARNING, CRITICAL
 
 ## Redis
 
-- MQTT credentials для фронтенд-пользователей: `mqtt:cred:user:{user_id}` → Hash
-- TTL: 24 часа, инвалидация через `InvalidateMqttCredentials`
+- MQTT credentials for frontend users: `mqtt:cred:user:{user_id}` → Hash
+- TTL: 24 hours, invalidation via `InvalidateMqttCredentials`
 
-## MQTT авторизация
+## MQTT Authorization
 
 - Usernames: `device:{id}` / `user:{id}` / `collector`
-- Устройства — постоянный токен (bcrypt-хеш), пользователи — временные credentials из Redis
+- Devices — persistent token (bcrypt hash), users — temporary credentials from Redis
 
 ## bcrypt
 
-Все вызовы `hashpw`/`checkpw` вынесены в `loop.run_in_executor()`.
+All `hashpw`/`checkpw` calls are offloaded to `loop.run_in_executor()`.
 
-## Пагинация
+## Pagination
 
-- `ListDevices` — `page`/`per_page` в proto, `total` в response
-- Остальные list-эндпоинты без пагинации
+- `ListDevices` — `page`/`per_page` in proto, `total` in response
+- Other list endpoints have no pagination
 
-## Internal методы (без auth)
+## Internal Methods (no auth)
 
 - GetAllThresholds, GetSensorThresholds, UpdateDeviceStatus, InvalidateMqttCredentials, DeleteDevicesByPlace
