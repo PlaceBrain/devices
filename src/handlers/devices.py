@@ -5,14 +5,6 @@ import grpc
 from dishka import FromDishka
 from dishka.integrations.grpcio import inject
 from placebrain_contracts import devices_pb2 as devices_pb
-from placebrain_contracts.devices_pb2_grpc import DevicesServiceServicer
-
-from src.core.exceptions import (
-    AlreadyExistsError,
-    InvalidValueError,
-    NotFoundError,
-    PermissionDeniedError,
-)
 from placebrain_contracts.devices_pb2 import (
     ACTUATOR_VALUE_TYPE_BOOLEAN,
     ACTUATOR_VALUE_TYPE_ENUM,
@@ -26,7 +18,14 @@ from placebrain_contracts.devices_pb2 import (
     VALUE_TYPE_BOOLEAN,
     VALUE_TYPE_NUMBER,
 )
+from placebrain_contracts.devices_pb2_grpc import DevicesServiceServicer
 
+from src.core.exceptions import (
+    AlreadyExistsError,
+    InvalidValueError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 from src.infra.db.models.actuator import ActuatorValueTypeEnum
 from src.infra.db.models.device import DeviceStatusEnum
 from src.infra.db.models.sensor import ValueTypeEnum
