@@ -6,9 +6,6 @@ from dishka import FromDishka
 from dishka.integrations.grpcio import inject
 from placebrain_contracts import devices_pb2 as devices_pb
 from placebrain_contracts.devices_pb2 import (
-    ACTUATOR_VALUE_TYPE_BOOLEAN,
-    ACTUATOR_VALUE_TYPE_ENUM,
-    ACTUATOR_VALUE_TYPE_NUMBER,
     DEVICE_STATUS_OFFLINE,
     DEVICE_STATUS_ONLINE,
     THRESHOLD_SEVERITY_CRITICAL,
@@ -16,6 +13,7 @@ from placebrain_contracts.devices_pb2 import (
     THRESHOLD_TYPE_MAX,
     THRESHOLD_TYPE_MIN,
     VALUE_TYPE_BOOLEAN,
+    VALUE_TYPE_ENUM,
     VALUE_TYPE_NUMBER,
 )
 from placebrain_contracts.devices_pb2_grpc import DevicesServiceServicer
@@ -59,15 +57,15 @@ _PROTO_TO_VALUE_TYPE = {
 }
 
 _ACTUATOR_VALUE_TYPE_TO_PROTO = {
-    ActuatorValueTypeEnum.NUMBER: ACTUATOR_VALUE_TYPE_NUMBER,
-    ActuatorValueTypeEnum.BOOLEAN: ACTUATOR_VALUE_TYPE_BOOLEAN,
-    ActuatorValueTypeEnum.ENUM: ACTUATOR_VALUE_TYPE_ENUM,
+    ActuatorValueTypeEnum.NUMBER: VALUE_TYPE_NUMBER,
+    ActuatorValueTypeEnum.BOOLEAN: VALUE_TYPE_BOOLEAN,
+    ActuatorValueTypeEnum.ENUM: VALUE_TYPE_ENUM,
 }
 
 _PROTO_TO_ACTUATOR_VALUE_TYPE = {
-    ACTUATOR_VALUE_TYPE_NUMBER: ActuatorValueTypeEnum.NUMBER,
-    ACTUATOR_VALUE_TYPE_BOOLEAN: ActuatorValueTypeEnum.BOOLEAN,
-    ACTUATOR_VALUE_TYPE_ENUM: ActuatorValueTypeEnum.ENUM,
+    VALUE_TYPE_NUMBER: ActuatorValueTypeEnum.NUMBER,
+    VALUE_TYPE_BOOLEAN: ActuatorValueTypeEnum.BOOLEAN,
+    VALUE_TYPE_ENUM: ActuatorValueTypeEnum.ENUM,
 }
 
 _THRESHOLD_TYPE_TO_PROTO = {

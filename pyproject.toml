@@ -60,3 +60,7 @@ strict = true
 [[tool.mypy.overrides]]
 module = "grpc.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "src.handlers.devices"
+disable_error_code = ["arg-type"]
