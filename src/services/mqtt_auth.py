@@ -58,7 +58,7 @@ class MqttAuthService:
 
     async def _authenticate_user(self, user_id_str: str, password: str) -> bool:
         redis_key = f"mqtt:cred:user:{user_id_str}"
-        cached = await self.redis.hgetall(redis_key)  # type: ignore[misc]
+        cached = await self.redis.hgetall(redis_key)
         if not cached:
             return False
         loop = asyncio.get_running_loop()
@@ -111,7 +111,7 @@ class MqttAuthService:
             return False
 
         redis_key = f"mqtt:cred:user:{user_id_str}"
-        raw = await self.redis.hget(redis_key, "allowed_place_ids")  # type: ignore[misc]
+        raw = await self.redis.hget(redis_key, "allowed_place_ids")
         if not raw:
             return False
 
@@ -137,7 +137,7 @@ class MqttAuthService:
         username = f"user:{user_id}"
         redis_key = f"mqtt:cred:{username}"
 
-        cached = await self.redis.hgetall(redis_key)  # type: ignore[misc]
+        cached = await self.redis.hgetall(redis_key)
         if cached:
             return cached["username"], cached["password"], int(cached["expires_at"])
 
@@ -152,7 +152,7 @@ class MqttAuthService:
         expires_at_ts = int(expires_at.timestamp())
         ttl_seconds = int(MQTT_CREDENTIALS_TTL.total_seconds())
 
-        await self.redis.hset(  # type: ignore[misc]
+        await self.redis.hset(
             redis_key,
             mapping={
                 "username": username,

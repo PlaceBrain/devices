@@ -63,5 +63,10 @@ module = "grpc.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = "redis.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
 module = "src.handlers.devices"
 disable_error_code = ["arg-type"]
