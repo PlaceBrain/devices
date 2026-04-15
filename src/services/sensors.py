@@ -1,8 +1,6 @@
 import logging
 from uuid import UUID
 
-from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
-
 from src.core.authorization import check_read_permission, check_write_permission
 from src.core.exceptions import AlreadyExistsError, NotFoundError
 from src.infra.db.models.sensor import Sensor, ValueTypeEnum
@@ -12,14 +10,15 @@ from src.infra.db.models.sensor_threshold import (
     ThresholdTypeEnum,
 )
 from src.infra.db.uow import UnitOfWork
+from src.services.role_cache import RoleCacheService
 
 logger = logging.getLogger(__name__)
 
 
 class SensorsService:
-    def __init__(self, uow: UnitOfWork, places_stub: PlacesServiceStub) -> None:
+    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService) -> None:
         self.uow = uow
-        self.places_stub = places_stub
+        self.role_cache = role_cache
 
     async def _get_device_or_fail(self, device_id: UUID, place_id: UUID) -> None:
         device = await self.uow.device_repository.get_by_id(device_id)
@@ -42,7 +41,7 @@ class SensorsService:
         unit_label: str,
         precision: int,
     ) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         existing = await self.uow.sensor_repository.get_one_or_none(device_id=device_id, key=key)
         if existing:
@@ -62,7 +61,7 @@ class SensorsService:
         return list(sensors)
 
     async def list_sensors(self, user_id: UUID, place_id: UUID, device_id: UUID) -> list[Sensor]:
-        await check_read_permission(self.places_stub, user_id, place_id)
+        await check_read_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         sensors = await self.uow.sensor_repository.get_all(device_id=device_id)
         return list(sensors)
@@ -77,7 +76,7 @@ class SensorsService:
         unit_label: str,
         precision: int,
     ) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         await self._get_sensor_or_fail(sensor_id, device_id)
         await self.uow.sensor_repository.update(
@@ -88,7 +87,7 @@ class SensorsService:
     async def delete_sensor(
         self, user_id: UUID, place_id: UUID, device_id: UUID, sensor_id: UUID
     ) -> bool:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         sensor = await self.uow.sensor_repository.get_by_id(sensor_id)
         if not sensor or sensor.device_id != device_id:
@@ -106,7 +105,7 @@ class SensorsService:
         value: float,
         severity: ThresholdSeverityEnum,
     ) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         await self._get_sensor_or_fail(sensor_id, device_id)
         threshold = await self.uow.sensor_threshold_repository.create(
@@ -117,7 +116,7 @@ class SensorsService:
     async def list_thresholds(
         self, user_id: UUID, place_id: UUID, device_id: UUID, sensor_id: UUID
     ) -> list[SensorThreshold]:
-        await check_read_permission(self.places_stub, user_id, place_id)
+        await check_read_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         await self._get_sensor_or_fail(sensor_id, device_id)
         thresholds = await self.uow.sensor_threshold_repository.get_all(sensor_id=sensor_id)
@@ -131,7 +130,7 @@ class SensorsService:
         sensor_id: UUID,
         threshold_id: UUID,
     ) -> bool:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
         await self._get_sensor_or_fail(sensor_id, device_id)
         threshold = await self.uow.sensor_threshold_repository.get_by_id(threshold_id)

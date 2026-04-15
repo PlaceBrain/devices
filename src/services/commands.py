@@ -3,22 +3,22 @@ import logging
 from uuid import UUID
 
 import aiomqtt
-from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
 from src.core.authorization import check_write_permission
 from src.core.exceptions import InvalidValueError, NotFoundError
 from src.infra.db.models.actuator import Actuator, ActuatorValueTypeEnum
 from src.infra.db.uow import UnitOfWork
+from src.services.role_cache import RoleCacheService
 
 logger = logging.getLogger(__name__)
 
 
 class CommandsService:
     def __init__(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub, mqtt_client: aiomqtt.Client
+        self, uow: UnitOfWork, role_cache: RoleCacheService, mqtt_client: aiomqtt.Client
     ) -> None:
         self.uow = uow
-        self.places_stub = places_stub
+        self.role_cache = role_cache
         self.mqtt_client = mqtt_client
 
     async def send_command(
@@ -29,7 +29,7 @@ class CommandsService:
         actuator_key: str,
         value: str,
     ) -> bool:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
 
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:

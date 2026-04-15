@@ -6,20 +6,20 @@ from typing import Any
 from uuid import UUID
 
 import bcrypt
-from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 
 from src.core.authorization import check_read_permission, check_write_permission
 from src.core.exceptions import NotFoundError
 from src.infra.db.models.device import Device, DeviceStatusEnum
 from src.infra.db.uow import UnitOfWork
+from src.services.role_cache import RoleCacheService
 
 logger = logging.getLogger(__name__)
 
 
 class DevicesService:
-    def __init__(self, uow: UnitOfWork, places_stub: PlacesServiceStub) -> None:
+    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService) -> None:
         self.uow = uow
-        self.places_stub = places_stub
+        self.role_cache = role_cache
 
     @staticmethod
     async def _generate_token() -> tuple[str, str]:
@@ -31,7 +31,7 @@ class DevicesService:
         return token, token_hash
 
     async def create_device(self, user_id: UUID, place_id: UUID, name: str) -> tuple[str, str]:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         token, token_hash = await self._generate_token()
         device = await self.uow.device_repository.create(
             place_id=place_id, name=name, token_hash=token_hash
@@ -39,7 +39,7 @@ class DevicesService:
         return str(device.id), token
 
     async def get_device(self, user_id: UUID, place_id: UUID, device_id: UUID) -> Device:
-        await check_read_permission(self.places_stub, user_id, place_id)
+        await check_read_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
@@ -48,7 +48,7 @@ class DevicesService:
     async def list_devices(
         self, user_id: UUID, place_id: UUID, page: int = 1, per_page: int = 20
     ) -> tuple[list[Device], int]:
-        await check_read_permission(self.places_stub, user_id, place_id)
+        await check_read_permission(self.role_cache, user_id, place_id)
         filters = [Device.place_id == place_id]
         devices = await self.uow.device_repository.find(
             filters=filters,
@@ -60,7 +60,7 @@ class DevicesService:
         return list(devices), total
 
     async def update_device(self, user_id: UUID, place_id: UUID, device_id: UUID, name: str) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
@@ -68,7 +68,7 @@ class DevicesService:
         return str(device_id)
 
     async def delete_device(self, user_id: UUID, place_id: UUID, device_id: UUID) -> bool:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
@@ -76,7 +76,7 @@ class DevicesService:
         return True
 
     async def regenerate_token(self, user_id: UUID, place_id: UUID, device_id: UUID) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         token, token_hash = await self._generate_token()
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:

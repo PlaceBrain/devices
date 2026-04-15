@@ -1,20 +1,19 @@
 import logging
 from uuid import UUID
 
-from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
-
 from src.core.authorization import check_read_permission, check_write_permission
 from src.core.exceptions import AlreadyExistsError, NotFoundError
 from src.infra.db.models.actuator import Actuator, ActuatorValueTypeEnum
 from src.infra.db.uow import UnitOfWork
+from src.services.role_cache import RoleCacheService
 
 logger = logging.getLogger(__name__)
 
 
 class ActuatorsService:
-    def __init__(self, uow: UnitOfWork, places_stub: PlacesServiceStub) -> None:
+    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService) -> None:
         self.uow = uow
-        self.places_stub = places_stub
+        self.role_cache = role_cache
 
     async def create_actuator(
         self,
@@ -31,7 +30,7 @@ class ActuatorsService:
         step: float | None,
         enum_options: list[str] | None,
     ) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
@@ -59,7 +58,7 @@ class ActuatorsService:
     async def list_actuators(
         self, user_id: UUID, place_id: UUID, device_id: UUID
     ) -> list[Actuator]:
-        await check_read_permission(self.places_stub, user_id, place_id)
+        await check_read_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
@@ -80,7 +79,7 @@ class ActuatorsService:
         step: float | None,
         enum_options: list[str] | None,
     ) -> str:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
@@ -102,7 +101,7 @@ class ActuatorsService:
     async def delete_actuator(
         self, user_id: UUID, place_id: UUID, device_id: UUID, actuator_id: UUID
     ) -> bool:
-        await check_write_permission(self.places_stub, user_id, place_id)
+        await check_write_permission(self.role_cache, user_id, place_id)
         device = await self.uow.device_repository.get_by_id(device_id)
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")

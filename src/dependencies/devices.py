@@ -1,6 +1,5 @@
 import aiomqtt
 from dishka import Provider, Scope, provide
-from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 from redis.asyncio import Redis
 
 from src.infra.db.uow import UnitOfWork
@@ -8,36 +7,41 @@ from src.services.actuators import ActuatorsService
 from src.services.commands import CommandsService
 from src.services.devices import DevicesService
 from src.services.mqtt_auth import MqttAuthService
+from src.services.role_cache import RoleCacheService
 from src.services.sensors import SensorsService
 
 
 class DevicesProvider(Provider):
     @provide(scope=Scope.REQUEST)
+    def provide_role_cache(self, redis: Redis) -> RoleCacheService:
+        return RoleCacheService(redis)
+
+    @provide(scope=Scope.REQUEST)
     def provide_devices_service(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub
+        self, uow: UnitOfWork, role_cache: RoleCacheService
     ) -> DevicesService:
-        return DevicesService(uow, places_stub)
+        return DevicesService(uow, role_cache)
 
     @provide(scope=Scope.REQUEST)
     def provide_sensors_service(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub
+        self, uow: UnitOfWork, role_cache: RoleCacheService
     ) -> SensorsService:
-        return SensorsService(uow, places_stub)
+        return SensorsService(uow, role_cache)
 
     @provide(scope=Scope.REQUEST)
     def provide_actuators_service(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub
+        self, uow: UnitOfWork, role_cache: RoleCacheService
     ) -> ActuatorsService:
-        return ActuatorsService(uow, places_stub)
+        return ActuatorsService(uow, role_cache)
 
     @provide(scope=Scope.REQUEST)
     def provide_commands_service(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub, mqtt_client: aiomqtt.Client
+        self, uow: UnitOfWork, role_cache: RoleCacheService, mqtt_client: aiomqtt.Client
     ) -> CommandsService:
-        return CommandsService(uow, places_stub, mqtt_client)
+        return CommandsService(uow, role_cache, mqtt_client)
 
     @provide(scope=Scope.REQUEST)
     def provide_mqtt_auth_service(
-        self, uow: UnitOfWork, places_stub: PlacesServiceStub, redis: Redis
+        self, uow: UnitOfWork, role_cache: RoleCacheService, redis: Redis
     ) -> MqttAuthService:
-        return MqttAuthService(uow, places_stub, redis)
+        return MqttAuthService(uow, role_cache, redis)

@@ -51,13 +51,17 @@ class RedisConfig(BaseModel):
     url: str = Field(default="redis://placebrain-redis:6379/0")
 
 
+class KafkaConfig(BaseModel):
+    url: str = Field(default="placebrain-kafka:19092")
+
+
 class Settings(BaseSettings):
     app: AppSettings = Field(default=...)
     logging: LoggingConfig = Field(default=...)
     database: PostgresConfig = Field(default=...)
     mqtt: MqttConfig = Field(default=...)
     redis: RedisConfig = Field(default_factory=RedisConfig)
-    places_service_url: str = Field(default=...)
+    kafka: KafkaConfig = Field(default_factory=KafkaConfig)
 
     class Config:
         env_file = BASE_DIR / ".env"

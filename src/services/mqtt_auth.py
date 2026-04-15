@@ -8,11 +8,10 @@ from uuid import UUID
 
 import bcrypt
 import orjson
-from placebrain_contracts.places_pb2 import ListPlacesRequest
-from placebrain_contracts.places_pb2_grpc import PlacesServiceStub
 from redis.asyncio import Redis
 
 from src.infra.db.uow import UnitOfWork
+from src.services.role_cache import RoleCacheService
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +23,9 @@ MQTT_CREDENTIALS_TTL = timedelta(hours=24)
 
 
 class MqttAuthService:
-    def __init__(self, uow: UnitOfWork, places_stub: PlacesServiceStub, redis: Redis) -> None:
+    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService, redis: Redis) -> None:
         self.uow = uow
-        self.places_stub = places_stub
+        self.role_cache = role_cache
         self.redis = redis
 
     async def authenticate(self, username: str, password: str) -> bool:
@@ -142,8 +141,7 @@ class MqttAuthService:
         if cached:
             return cached["username"], cached["password"], int(cached["expires_at"])
 
-        places_response = await self.places_stub.ListPlaces(ListPlacesRequest(user_id=str(user_id)))
-        allowed_place_ids = [p.place_id for p in places_response.places]
+        allowed_place_ids = list(await self.role_cache.get_user_places(user_id))
 
         password = secrets.token_urlsafe(32)
         loop = asyncio.get_running_loop()
