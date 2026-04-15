@@ -3,6 +3,15 @@ from typing import Any
 from uuid import UUID
 
 from faststream.kafka import KafkaBroker
+from placebrain_contracts.events import (
+    BaseEvent,
+    DevicesBulkDeleted,
+    MemberAdded,
+    MemberRemoved,
+    MemberRoleChanged,
+    PlaceDeleted,
+)
+from pydantic import ValidationError
 
 from src.services.devices import DevicesService
 from src.services.mqtt_auth import MqttAuthService
@@ -11,6 +20,13 @@ from src.services.role_cache import RoleCacheService
 logger = logging.getLogger(__name__)
 
 DEVICES_EVENTS_TOPIC = "devices.events"
+
+PLACES_EVENT_MAP: dict[str, type[BaseEvent]] = {
+    "member.added": MemberAdded,
+    "member.removed": MemberRemoved,
+    "member.role_changed": MemberRoleChanged,
+    "place.deleted": PlaceDeleted,
+}
 
 
 async def handle_places_event(
@@ -21,46 +37,49 @@ async def handle_places_event(
     broker: KafkaBroker,
 ) -> None:
     event_type = data.get("event_type")
+    model_cls = PLACES_EVENT_MAP.get(event_type)  # type: ignore[arg-type]
+    if not model_cls:
+        logger.warning("Unknown places event type: %s", event_type)
+        return
 
-    if event_type == "member.added":
-        place_id = UUID(data["place_id"])
-        user_id = UUID(data["user_id"])
-        role = data["role"]
-        await role_cache.set_role(place_id, user_id, role)
-        logger.info("Role cache updated: %s in %s = %s", user_id, place_id, role)
+    try:
+        event = model_cls.model_validate(data)
+    except ValidationError:
+        logger.exception("Invalid places event payload: %s", event_type)
+        return
 
-    elif event_type == "member.removed":
-        place_id = UUID(data["place_id"])
-        user_id = UUID(data["user_id"])
-        await role_cache.remove_role(place_id, user_id)
-        await mqtt_auth_service.invalidate_credentials([str(user_id)])
-        logger.info("Role removed and MQTT creds invalidated: %s from %s", user_id, place_id)
+    if isinstance(event, MemberAdded):
+        await role_cache.set_role(event.place_id, event.user_id, event.role)
+        logger.info("Role cache updated: %s in %s = %s", event.user_id, event.place_id, event.role)
 
-    elif event_type == "member.role_changed":
-        place_id = UUID(data["place_id"])
-        user_id = UUID(data["user_id"])
-        role = data["role"]
-        await role_cache.set_role(place_id, user_id, role)
-        logger.info("Role cache updated: %s in %s = %s", user_id, place_id, role)
+    elif isinstance(event, MemberRemoved):
+        await role_cache.remove_role(event.place_id, event.user_id)
+        await mqtt_auth_service.invalidate_credentials([str(event.user_id)])
+        logger.info(
+            "Role removed and MQTT creds invalidated: %s from %s",
+            event.user_id,
+            event.place_id,
+        )
 
-    elif event_type == "place.deleted":
-        place_id = UUID(data["place_id"])
-        member_ids = [str(m) for m in data["member_ids"]]
-        await role_cache.remove_place(place_id)
-        deleted_count, device_ids = await devices_service.delete_devices_by_place(place_id)
+    elif isinstance(event, MemberRoleChanged):
+        await role_cache.set_role(event.place_id, event.user_id, event.role)
+        logger.info("Role cache updated: %s in %s = %s", event.user_id, event.place_id, event.role)
+
+    elif isinstance(event, PlaceDeleted):
+        member_ids = [str(m) for m in event.member_ids]
+        await role_cache.remove_place(event.place_id)
+        deleted_count, device_ids = await devices_service.delete_devices_by_place(event.place_id)
         await mqtt_auth_service.invalidate_credentials(member_ids)
         if device_ids:
+            bulk_event = DevicesBulkDeleted(device_ids=[UUID(d) for d in device_ids])
             await broker.publish(
-                {
-                    "event_type": "devices.bulk_deleted",
-                    "device_ids": device_ids,
-                },
+                bulk_event.model_dump(mode="json"),
                 topic=DEVICES_EVENTS_TOPIC,
-                key=str(place_id).encode(),
+                key=str(event.place_id).encode(),
             )
         logger.info(
             "Place %s deleted: %d devices removed, %d members invalidated",
-            place_id,
+            event.place_id,
             deleted_count,
             len(member_ids),
         )

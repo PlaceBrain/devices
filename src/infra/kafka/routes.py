@@ -15,14 +15,22 @@ logger = logging.getLogger(__name__)
 def register_subscribers(broker: KafkaBroker, container: AsyncContainer) -> None:
     @broker.subscriber("places.events", group_id="devices-service", no_ack=True)
     async def on_places_event(msg: dict[str, Any]) -> None:
-        async with container() as request_container:
-            role_cache = await request_container.get(RoleCacheService)
-            devices_service = await request_container.get(DevicesService)
-            mqtt_auth_service = await request_container.get(MqttAuthService)
-            await handle_places_event(msg, role_cache, devices_service, mqtt_auth_service, broker)
+        try:
+            async with container() as request_container:
+                role_cache = await request_container.get(RoleCacheService)
+                devices_service = await request_container.get(DevicesService)
+                mqtt_auth_service = await request_container.get(MqttAuthService)
+                await handle_places_event(
+                    msg, role_cache, devices_service, mqtt_auth_service, broker
+                )
+        except Exception:
+            logger.exception("Failed to handle places event: %s", msg.get("event_type"))
 
     @broker.subscriber("telemetry.status", group_id="devices-service", no_ack=True)
     async def on_device_status(msg: dict[str, Any]) -> None:
-        async with container() as request_container:
-            devices_service = await request_container.get(DevicesService)
-            await handle_device_status(msg, devices_service)
+        try:
+            async with container() as request_container:
+                devices_service = await request_container.get(DevicesService)
+                await handle_device_status(msg, devices_service)
+        except Exception:
+            logger.exception("Failed to handle device status: %s", msg.get("topic"))

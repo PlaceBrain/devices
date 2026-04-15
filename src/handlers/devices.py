@@ -316,6 +316,9 @@ class DevicesHandler(DevicesServiceServicer):
         except PermissionDeniedError as e:
             await context.abort(grpc.StatusCode.PERMISSION_DENIED, str(e))
             raise
+        except NotFoundError as e:
+            await context.abort(grpc.StatusCode.NOT_FOUND, str(e))
+            raise
         except AlreadyExistsError as e:
             await context.abort(grpc.StatusCode.ALREADY_EXISTS, str(e))
             raise
@@ -535,14 +538,17 @@ class DevicesHandler(DevicesServiceServicer):
                 value_type,
                 request.unit_label,
                 request.precision,
-                request.min_value or None,
-                request.max_value or None,
-                request.step or None,
+                request.min_value if request.min_value is not None else None,
+                request.max_value if request.max_value is not None else None,
+                request.step if request.step is not None else None,
                 list(request.enum_options) or None,
             )
             return devices_pb.CreateActuatorResponse(actuator_id=actuator_id)
         except PermissionDeniedError as e:
             await context.abort(grpc.StatusCode.PERMISSION_DENIED, str(e))
+            raise
+        except NotFoundError as e:
+            await context.abort(grpc.StatusCode.NOT_FOUND, str(e))
             raise
         except AlreadyExistsError as e:
             await context.abort(grpc.StatusCode.ALREADY_EXISTS, str(e))

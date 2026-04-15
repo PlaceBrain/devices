@@ -21,6 +21,12 @@ class DevicesService:
         self.uow = uow
         self.role_cache = role_cache
 
+    async def _get_device_or_fail(self, device_id: UUID, place_id: UUID) -> Device:
+        device = await self.uow.device_repository.get_by_id(device_id)
+        if not device or device.place_id != place_id:
+            raise NotFoundError("Device not found")
+        return device
+
     @staticmethod
     async def _generate_token() -> tuple[str, str]:
         token = secrets.token_urlsafe(32)
@@ -40,10 +46,7 @@ class DevicesService:
 
     async def get_device(self, user_id: UUID, place_id: UUID, device_id: UUID) -> Device:
         await check_read_permission(self.role_cache, user_id, place_id)
-        device = await self.uow.device_repository.get_by_id(device_id)
-        if not device or device.place_id != place_id:
-            raise NotFoundError("Device not found")
-        return device
+        return await self._get_device_or_fail(device_id, place_id)
 
     async def list_devices(
         self, user_id: UUID, place_id: UUID, page: int = 1, per_page: int = 20
@@ -61,26 +64,20 @@ class DevicesService:
 
     async def update_device(self, user_id: UUID, place_id: UUID, device_id: UUID, name: str) -> str:
         await check_write_permission(self.role_cache, user_id, place_id)
-        device = await self.uow.device_repository.get_by_id(device_id)
-        if not device or device.place_id != place_id:
-            raise NotFoundError("Device not found")
+        await self._get_device_or_fail(device_id, place_id)
         await self.uow.device_repository.update(device_id, name=name)
         return str(device_id)
 
     async def delete_device(self, user_id: UUID, place_id: UUID, device_id: UUID) -> bool:
         await check_write_permission(self.role_cache, user_id, place_id)
-        device = await self.uow.device_repository.get_by_id(device_id)
-        if not device or device.place_id != place_id:
-            raise NotFoundError("Device not found")
+        device = await self._get_device_or_fail(device_id, place_id)
         await self.uow.device_repository.delete(device)
         return True
 
     async def regenerate_token(self, user_id: UUID, place_id: UUID, device_id: UUID) -> str:
         await check_write_permission(self.role_cache, user_id, place_id)
         token, token_hash = await self._generate_token()
-        device = await self.uow.device_repository.get_by_id(device_id)
-        if not device or device.place_id != place_id:
-            raise NotFoundError("Device not found")
+        await self._get_device_or_fail(device_id, place_id)
         await self.uow.device_repository.update(device_id, token_hash=token_hash)
         return token
 

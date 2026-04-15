@@ -57,8 +57,8 @@ class CommandsService:
         elif value_type == ActuatorValueTypeEnum.NUMBER:
             try:
                 num = float(value)
-            except ValueError:
-                raise InvalidValueError("Number actuator value must be numeric") from None
+            except ValueError as e:
+                raise InvalidValueError("Number actuator value must be numeric") from e
             if actuator.min_value is not None and num < actuator.min_value:
                 raise InvalidValueError(f"Value below minimum ({actuator.min_value})")
             if actuator.max_value is not None and num > actuator.max_value:
