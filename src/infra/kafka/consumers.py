@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 DEVICES_EVENTS_TOPIC = "devices.events"
 
 
-async def on_places_event(
+async def handle_places_event(
     data: dict[str, Any],
     role_cache: RoleCacheService,
     devices_service: DevicesService,
@@ -66,7 +66,7 @@ async def on_places_event(
         )
 
 
-async def on_device_status(
+async def handle_device_status(
     data: dict[str, Any],
     devices_service: DevicesService,
 ) -> None:
