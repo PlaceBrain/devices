@@ -2,8 +2,8 @@
 
 - **Port:** 50053
 - **DB:** devices_db (PostgreSQL), Redis
+- **Kafka:** consumer (`places.events`, `telemetry.status`) + producer (`devices.events`)
 - MQTT client for sending commands to devices
-- Depends on places (role checks), MQTT broker, and Redis
 
 ## Structure
 
@@ -20,7 +20,7 @@ src/
 │   ├── config.py
 │   ├── db.py                        # DatabaseHelper (APP), UoW (REQUEST, yield-based)
 │   ├── devices.py                   # DevicesService, SensorsService, ActuatorsService, CommandsService
-│   ├── grpc.py                      # PlacesServiceStub (APP)
+│   ├── kafka.py                     # KafkaBroker (APP scope)
 │   ├── mqtt.py                      # MQTT client (APP)
 │   ├── mqtt_auth.py                 # MqttAuthService (REQUEST)
 │   └── redis.py                     # Redis client (APP)
@@ -31,12 +31,17 @@ src/
 │   ├── sensors.py                   # CRUD sensors, thresholds
 │   ├── actuators.py                 # CRUD actuators
 │   ├── commands.py                  # Sending commands via MQTT
-│   └── mqtt_auth.py                 # MQTT authentication and ACL
-└── infra/db/
-    ├── helper.py
-    ├── uow.py
-    ├── models/                      # Device, Sensor, Actuator, SensorThreshold
-    └── repositories/
+│   ├── mqtt_auth.py                 # MQTT authentication and ACL
+│   └── role_cache.py                # RoleCacheService (Redis-based role cache)
+└── infra/
+    ├── db/
+    │   ├── helper.py
+    │   ├── uow.py
+    │   ├── models/                  # Device, Sensor, Actuator, SensorThreshold
+    │   └── repositories/
+    └── kafka/
+        ├── consumers.py             # Event handlers (places events, device status)
+        └── routes.py                # Kafka subscriber registration
 ```
 
 ## Protobuf Imports
@@ -58,7 +63,9 @@ Typed exceptions from `core/exceptions.py`:
 
 ## Authorization
 
-Shared functions `check_write_permission` and `check_read_permission` in `core/authorization.py`. They verify roles via gRPC call to the places service.
+Shared functions `check_write_permission` and `check_read_permission` in `core/authorization.py`. They verify roles via `RoleCacheService` (Redis-backed). The cache is populated by Kafka events from places service — no synchronous gRPC calls to places.
+
+**Device validation helper:** Services that check device existence + place ownership use `_get_device_or_fail(device_id, place_id)` — do not inline this check.
 
 ## UnitOfWork
 
@@ -73,8 +80,9 @@ Managed via DI teardown (yield-based). Services work with repositories directly 
 
 ## Redis
 
-- MQTT credentials for frontend users: `mqtt:cred:user:{user_id}` → Hash
-- TTL: 24 hours, invalidation via `InvalidateMqttCredentials`
+- **Role cache:** `place_roles:{place_id}` → Hash (user_id → role), `user_places:{user_id}` → Set of place_ids. Populated via Kafka events from places service
+- **MQTT credentials:** `mqtt:cred:user:{user_id}` → Hash, TTL 24h, invalidation via Kafka events (`MemberRemoved`, `PlaceDeleted`)
+- **mypy:** `redis` module is ignored in mypy config (`follow_imports = "skip"`) — redis-py has incomplete type stubs
 
 ## MQTT Authorization
 
@@ -93,3 +101,20 @@ All `hashpw`/`checkpw` calls are offloaded to `loop.run_in_executor()`.
 ## Internal Methods (no auth)
 
 - GetAllThresholds, GetSensorThresholds, UpdateDeviceStatus, InvalidateMqttCredentials, DeleteDevicesByPlace
+
+## Kafka Events
+
+**Consumes** from `places.events` (group: `devices-service`):
+
+| Event | Action |
+|-------|--------|
+| `MemberAdded` | Update role cache |
+| `MemberRemoved` | Remove role + invalidate MQTT credentials |
+| `MemberRoleChanged` | Update role cache |
+| `PlaceDeleted` | Remove roles, delete devices, invalidate MQTT credentials, publish `DevicesBulkDeleted` |
+
+**Consumes** from `telemetry.status` (group: `devices-service`):
+- Device status updates (online/offline)
+
+**Produces** to `devices.events`:
+- `DevicesBulkDeleted` — when place is deleted and its devices are removed
