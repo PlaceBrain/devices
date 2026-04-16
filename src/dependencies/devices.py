@@ -1,5 +1,6 @@
 import aiomqtt
 from dishka import Provider, Scope, provide
+from faststream.kafka import KafkaBroker
 from redis.asyncio import Redis
 
 from src.infra.db.uow import UnitOfWork
@@ -18,15 +19,15 @@ class DevicesProvider(Provider):
 
     @provide(scope=Scope.REQUEST)
     def provide_devices_service(
-        self, uow: UnitOfWork, role_cache: RoleCacheService
+        self, uow: UnitOfWork, role_cache: RoleCacheService, broker: KafkaBroker
     ) -> DevicesService:
-        return DevicesService(uow, role_cache)
+        return DevicesService(uow, role_cache, broker)
 
     @provide(scope=Scope.REQUEST)
     def provide_sensors_service(
-        self, uow: UnitOfWork, role_cache: RoleCacheService
+        self, uow: UnitOfWork, role_cache: RoleCacheService, broker: KafkaBroker
     ) -> SensorsService:
-        return SensorsService(uow, role_cache)
+        return SensorsService(uow, role_cache, broker)
 
     @provide(scope=Scope.REQUEST)
     def provide_actuators_service(

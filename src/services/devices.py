@@ -6,6 +6,11 @@ from typing import Any
 from uuid import UUID
 
 import bcrypt
+from faststream.kafka import KafkaBroker
+from placebrain_contracts.events import (
+    TOPIC_DEVICE_DELETED,
+    DeviceDeleted,
+)
 
 from src.core.authorization import check_read_permission, check_write_permission
 from src.core.exceptions import NotFoundError
@@ -17,9 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class DevicesService:
-    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService) -> None:
+    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService, broker: KafkaBroker) -> None:
         self.uow = uow
         self.role_cache = role_cache
+        self.broker = broker
 
     async def _get_device_or_fail(self, device_id: UUID, place_id: UUID) -> Device:
         device = await self.uow.device_repository.get_by_id(device_id)
@@ -72,6 +78,11 @@ class DevicesService:
         await check_write_permission(self.role_cache, user_id, place_id)
         device = await self._get_device_or_fail(device_id, place_id)
         await self.uow.device_repository.delete(device)
+        await self.broker.publish(
+            DeviceDeleted(device_id=device_id, place_id=place_id),
+            topic=TOPIC_DEVICE_DELETED,
+            key=str(device_id).encode(),
+        )
         return True
 
     async def regenerate_token(self, user_id: UUID, place_id: UUID, device_id: UUID) -> str:

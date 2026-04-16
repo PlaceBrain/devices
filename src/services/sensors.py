@@ -1,6 +1,14 @@
 import logging
 from uuid import UUID
 
+from faststream.kafka import KafkaBroker
+from placebrain_contracts.events import (
+    TOPIC_THRESHOLD_CREATED,
+    TOPIC_THRESHOLD_DELETED,
+    ThresholdCreated,
+    ThresholdDeleted,
+)
+
 from src.core.authorization import check_read_permission, check_write_permission
 from src.core.exceptions import AlreadyExistsError, NotFoundError
 from src.infra.db.models.sensor import Sensor, ValueTypeEnum
@@ -16,9 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class SensorsService:
-    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService) -> None:
+    def __init__(self, uow: UnitOfWork, role_cache: RoleCacheService, broker: KafkaBroker) -> None:
         self.uow = uow
         self.role_cache = role_cache
+        self.broker = broker
 
     async def _get_device_or_fail(self, device_id: UUID, place_id: UUID) -> None:
         device = await self.uow.device_repository.get_by_id(device_id)
@@ -111,6 +120,17 @@ class SensorsService:
         threshold = await self.uow.sensor_threshold_repository.create(
             sensor_id=sensor_id, type=type, value=value, severity=severity
         )
+        await self.broker.publish(
+            ThresholdCreated(
+                sensor_id=sensor_id,
+                threshold_id=threshold.id,
+                threshold_type=type.value,  # type: ignore[arg-type]
+                value=value,
+                severity=severity.value,  # type: ignore[arg-type]
+            ),
+            topic=TOPIC_THRESHOLD_CREATED,
+            key=str(sensor_id).encode(),
+        )
         return str(threshold.id)
 
     async def list_thresholds(
@@ -137,6 +157,11 @@ class SensorsService:
         if not threshold or threshold.sensor_id != sensor_id:
             raise NotFoundError("Threshold not found")
         await self.uow.sensor_threshold_repository.delete(threshold)
+        await self.broker.publish(
+            ThresholdDeleted(sensor_id=sensor_id, threshold_id=threshold_id),
+            topic=TOPIC_THRESHOLD_DELETED,
+            key=str(sensor_id).encode(),
+        )
         return True
 
     async def get_sensor_thresholds(self, sensor_id: UUID) -> list[SensorThreshold]:

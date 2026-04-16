@@ -39,9 +39,8 @@ src/
     │   ├── uow.py
     │   ├── models/                  # Device, Sensor, Actuator, SensorThreshold
     │   └── repositories/
-    └── kafka/
-        ├── consumers.py             # Event handlers (places events, device status)
-        └── routes.py                # Kafka subscriber registration
+    └── broker/
+        └── routes.py                # KafkaRouter with typed subscribers (FromDishka DI)
 ```
 
 ## Protobuf Imports
@@ -104,17 +103,23 @@ All `hashpw`/`checkpw` calls are offloaded to `loop.run_in_executor()`.
 
 ## Kafka Events
 
-**Consumes** from `places.events` (group: `devices-service`):
+Subscribers in `src/infra/broker/routes.py` via `KafkaRouter` + `FromDishka[]`. One topic per event type.
 
-| Event | Action |
-|-------|--------|
-| `MemberAdded` | Update role cache |
-| `MemberRemoved` | Remove role + invalidate MQTT credentials |
-| `MemberRoleChanged` | Update role cache |
-| `PlaceDeleted` | Remove roles, delete devices, invalidate MQTT credentials, publish `DevicesBulkDeleted` |
+**Consumes** (group: `devices-service`):
 
-**Consumes** from `telemetry.status` (group: `devices-service`):
-- Device status updates (online/offline)
+| Topic | Event | Action |
+|-------|-------|--------|
+| `places.member.added` | `MemberAdded` | Update role cache |
+| `places.member.removed` | `MemberRemoved` | Remove role + invalidate MQTT credentials |
+| `places.member.role-changed` | `MemberRoleChanged` | Update role cache |
+| `places.place.deleted` | `PlaceDeleted` | Remove roles, delete devices, invalidate MQTT creds, publish `DevicesBulkDeleted` via publisher chain |
+| `telemetry.status` | `EmqxStatusMessage` | Device status updates (online/offline) |
 
-**Produces** to `devices.events`:
-- `DevicesBulkDeleted` — when place is deleted and its devices are removed
+**Produces:**
+
+| Topic | Event | Trigger |
+|-------|-------|---------|
+| `devices.device.bulk-deleted` | `DevicesBulkDeleted` | Publisher chain from `on_place_deleted` |
+| `devices.threshold.created` | `ThresholdCreated` | `SensorsService.set_threshold()` |
+| `devices.threshold.deleted` | `ThresholdDeleted` | `SensorsService.delete_threshold()` |
+| `devices.device.deleted` | `DeviceDeleted` | `DevicesService.delete_device()` |
