@@ -124,9 +124,9 @@ class SensorsService:
             ThresholdCreated(
                 sensor_id=sensor_id,
                 threshold_id=threshold.id,
-                threshold_type=type.value,  # type: ignore[arg-type]
+                threshold_type=type.value,
                 value=value,
-                severity=severity.value,  # type: ignore[arg-type]
+                severity=severity.value,
             ),
             topic=TOPIC_THRESHOLD_CREATED,
             key=str(sensor_id).encode(),
