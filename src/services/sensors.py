@@ -34,10 +34,11 @@ class SensorsService:
         if not device or device.place_id != place_id:
             raise NotFoundError("Device not found")
 
-    async def _get_sensor_or_fail(self, sensor_id: UUID, device_id: UUID) -> None:
+    async def _get_sensor_or_fail(self, sensor_id: UUID, device_id: UUID) -> Sensor:
         sensor = await self.uow.sensor_repository.get_by_id(sensor_id)
         if not sensor or sensor.device_id != device_id:
             raise NotFoundError("Sensor not found")
+        return sensor
 
     async def create_sensor(
         self,
@@ -116,13 +117,15 @@ class SensorsService:
     ) -> str:
         await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
-        await self._get_sensor_or_fail(sensor_id, device_id)
+        sensor = await self._get_sensor_or_fail(sensor_id, device_id)
         threshold = await self.uow.sensor_threshold_repository.create(
             sensor_id=sensor_id, type=type, value=value, severity=severity
         )
         await self.broker.publish(
             ThresholdCreated(
                 sensor_id=sensor_id,
+                device_id=device_id,
+                key=sensor.key,
                 threshold_id=threshold.id,
                 threshold_type=type.value,
                 value=value,
@@ -152,13 +155,18 @@ class SensorsService:
     ) -> bool:
         await check_write_permission(self.role_cache, user_id, place_id)
         await self._get_device_or_fail(device_id, place_id)
-        await self._get_sensor_or_fail(sensor_id, device_id)
+        sensor = await self._get_sensor_or_fail(sensor_id, device_id)
         threshold = await self.uow.sensor_threshold_repository.get_by_id(threshold_id)
         if not threshold or threshold.sensor_id != sensor_id:
             raise NotFoundError("Threshold not found")
         await self.uow.sensor_threshold_repository.delete(threshold)
         await self.broker.publish(
-            ThresholdDeleted(sensor_id=sensor_id, threshold_id=threshold_id),
+            ThresholdDeleted(
+                sensor_id=sensor_id,
+                device_id=device_id,
+                key=sensor.key,
+                threshold_id=threshold_id,
+            ),
             topic=TOPIC_THRESHOLD_DELETED,
             key=str(sensor_id).encode(),
         )
